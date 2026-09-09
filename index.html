@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages 图床管理器</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: var(--text-main);
+        }
+        .config-box {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .config-box input {
+            flex: 1;
+            min-width: 260px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            font-size: 0.95rem;
+        }
+        .config-box button, .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .config-box button:hover, .btn:hover {
+            background-color: var(--primary-hover);
+        }
+        .upload-area {
+            background: var(--card-bg);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 24px;
+            transition: border-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary-color);
+        }
+        .upload-area p {
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+        }
+        .card-preview {
+            width: 100%;
+            height: 160px;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        .card-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .card-preview audio {
+            width: 90%;
+        }
+        .card-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        .file-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            word-break: break-all;
+            color: var(--text-main);
+        }
+        .input-group {
+            display: flex;
+            gap: 6px;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 6px;
+            font-size: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: #f8fafc;
+            color: var(--text-secondary);
+        }
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-copy { background: #e0e7ff; color: #3730a3; }
+        .btn-open { background: #d1fae5; color: #065f46; }
+        .btn-delete { background: #fee2e2; color: #991b1b; }
+        .btn-copy:hover { background: #c7d2fe; }
+        .btn-open:hover { background: #a7f3d0; }
+        .btn-delete:hover { background: #fecaca; }
+
+        /* Modal styling for format export picker */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+        .modal {
+            background: #ffffff;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .format-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .format-row img, .format-row .audio-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .format-select-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        .format-select-wrapper select {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: white;
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+        }
+        .loading-mask {
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(255,255,255,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>📂 GitHub Pages 图床管理器</h1>
+        <button class="btn" onclick="openFormatModal()">⚙️ 导出格式选择面板</button>
+    </header>
+
+    <div class="config-box">
+        <input type="password" id="tokenInput" placeholder="输入 GitHub Personal Access Token (ghp_...)">
+        <button onclick="saveToken()">保存 Token</button>
+        <button class="btn" style="background-color: #64748b;" onclick="loadFiles()">刷新图库</button>
+    </div>
+
+    <div class="upload-area" id="dropArea" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" multiple style="display: none" onchange="handleFiles(this.files)">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary-color); margin: 0 auto;"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <p>点击或将图片/音频文件拖拽到此处上传（支持多选）</p>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">支持: JPG, PNG, GIF, WEBP, SVG, BMP, ICO, MP3, WAV, M4A, OGG, FLAC, AAC</p>
+    </div>
+
+    <div class="toolbar">
+        <h3>已上传文件列表 (<span id="fileCount">0</span>)</h3>
+    </div>
+
+    <div class="gallery" id="gallery">
+        <!-- 文件卡片动态加载 -->
+    </div>
+
+    <!-- 导出格式选择弹窗面板 -->
+    <div class="modal-overlay" id="formatModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span>导出文件格式选择</span>
+                <button onclick="closeFormatModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBodyList">
+                <!-- 动态生成每行预览与下拉菜单 -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn" style="background:#e2e8f0;color:var(--text-main);" onclick="closeFormatModal()">取消</button>
+                <button class="btn" onclick="confirmFormatSelections()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-mask" id="loadingMask">正在处理中...</div>
+
+    <script>
+        const OWNER = "1528704298-ai";
+        const REPO = "it-is-";
+        const BRANCH = "main";
+
+        const formatOptions = [
+            "(不选择)",
+            "JPG", "PNG", "GIF", "WEBP", "SVG", "BMP", "ICO",
+            "MP3", "WAV", "M4A", "OGG", "FLAC", "AAC"
+        ];
+
+        let uploadedFilesCache = [];
+
+        window.onload = function() {
+            const savedToken = localStorage.getItem("gh_token");
+            if (savedToken) {
+                document.getElementById("tokenInput").value = savedToken;
+                loadFiles();
+            }
+
+            // Drag and drop events
+            const dropArea = document.getElementById("dropArea");
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, (e) => { e.preventDefault(); dropArea.classList.add('dragover'); }, false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, (e) => { e.preventDefault(); dropArea.classList.remove('dragover'); }, false);
+            });
+            dropArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            });
+        };
+
+        function saveToken() {
+            const token = document.getElementById("tokenInput").value.trim();
+            if (!token) {
+                alert("请输入有效的 Token");
+                return;
+            }
+            localStorage.setItem("gh_token", token);
+            alert("Token 保存成功！");
+            loadFiles();
+        }
+
+        function getToken() {
+            return document.getElementById("tokenInput").value.trim();
+        }
+
+        function showLoading(text = "正在处理中...") {
+            const mask = document.getElementById("loadingMask");
+            mask.innerText = text;
+            mask.style.display = "flex";
+        }
+
+        function hideLoading() {
+            document.getElementById("loadingMask").style.display = "none";
+        }
+
+        async function loadFiles() {
+            const token = getToken();
+            if (!token) {
+                return;
+            }
+            showLoading("正在加载文件列表...");
+            try {
+                // Fetch contents of repository root or appropriate folder
+                const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents`, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                if (!res.ok) throw new Error("获取文件列表失败，请检查 Token 或仓库配置");
+                const data = await res.json();
+                
+                // Filter files (exclude directories, readme, etc if needed, or keep all assets)
+                uploadedFilesCache = data.filter(item => item.type === 'file');
+                renderGallery(uploadedFilesCache);
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderGallery(files) {
+            const gallery = document.getElementById("gallery");
+            gallery.innerHTML = "";
+            document.getElementById("fileCount").innerText = files.length;
+
+            if (files.length === 0) {
+                gallery.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">暂无文件，请上方上传文件</p>`;
+                return;
+            }
+
+            files.forEach(file => {
+                const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURIComponent(file.name)}`;
+                const pageUrl = `https://${OWNER}.github.io/${REPO}/${encodeURIComponent(file.name)}`;
+                const ext = file.name.split('.').pop().toLowerCase();
+                const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext);
+                const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac'].includes(ext);
+
+                const card = document.createElement("div");
+                card.className = "card";
+
+                let previewHtml = '';
+                if (isImg) {
+                    previewHtml = `<div class="card-preview"><img src="${rawUrl}" alt="${file.name}" loading="lazy"></div>`;
+                } else if (isAudio) {
+                    previewHtml = `<div class="card-preview"><audio controls src="${rawUrl}"></audio></div>`;
+                } else {
+                    previewHtml = `<div class="card-preview"><span style="font-size:0.9rem; color:#64748b;">${ext.toUpperCase()} 文件</span></div>`;
+                }
+
+                card.innerHTML = `
+                    ${previewHtml}
+                    <div class="card-body">
+                        <div class="file-name" title="${file.name}">${file.name}</div>
+                        <div class="input-group">
+                            <input type="text" value="${pageUrl}" readonly id="input-${file.sha}">
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn-sm btn-copy" onclick="copyLink('input-${file.sha}')">复制链接</button>
+                            <button class="btn-sm btn-open" onclick="window.open('${pageUrl}', '_blank')">打开</button>
+                            <button class="btn-sm btn-delete" onclick="deleteFile('${file.name}', '${file.sha}')">删除</button>
+                        </div>
+                    </div>
+                `;
+                gallery.appendChild(card);
+            });
+        }
+
+        function copyLink(elementId) {
+            const input = document.getElementById(elementId);
+            input.select();
+            document.execCommand("copy");
+            alert("链接已复制到剪贴板！");
+        }
+
+        async function handleFiles(files) {
+            const token = getToken();
+            if (!token) {
+                alert("请先填写并保存 GitHub Token！");
+                return;
+            }
+            if (!files || files.length === 0) return;
+
+            showLoading(`准备上传 0/${files.length} 个文件...`);
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                showLoading(`正在上传: ${file.name} (${i+1}/${files.length})`);
+                try {
+                    const base64Content = await fileToBase64(file);
+                    // Remove data URL prefix like "data:image/png;base64,"
+                    const base64Data = base64Content.split(',')[1];
+
+                    const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(file.name)}`;
+                    const res = await fetch(url, {
+                        method: "PUT",
+                        headers: {
+                            "Authorization": `token ${token}`,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            message: `Upload ${file.name} via Web Manager`,
+                            content: base64Data,
+                            branch: BRANCH
+                        })
+                    });
+
+                    if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.message || "上传失败");
+                    }
+                } catch (err) {
+                    alert(`文件 ${file.name} 上传失败: ${err.message}`);
+                }
+            }
+
+            hideLoading();
+            alert("所有文件上传操作完成！");
+            loadFiles();
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function deleteFile(fileName, sha) {
+            const token = getToken();
+            if (!token) {
+                alert("请先填写 Token！");
+                return;
+            }
+            if (!confirm(`确定要删除文件 "${fileName}" 吗？`)) return;
+
+            showLoading("正在删除...");
+            try {
+                const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(fileName)}`;
+                const res = await fetch(url, {
+                    method: "DELETE",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: `Delete ${fileName} via Web Manager`,
+                        sha: sha,
+                        branch: BRANCH
+                    })
+                });
+
+                if (!res.ok) throw new Error("删除失败");
+                alert("文件删除成功！");
+                loadFiles();
+            } catch (err) {
+                alert(`删除失败: ${err.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Format Modal logic
+        function openFormatModal() {
+            const modalBody = document.getElementById("modalBodyList");
+            modalBody.innerHTML = "";
+
+            if (uploadedFilesCache.length === 0) {
+                modalBody.innerHTML = `<p style="text-align: center; color: var(--text-secondary); padding: 20px;">当前仓库暂无文件可供选择导出格式</p>`;
+            } else {
+                uploadedFilesCache.forEach((file, index) => {
+                    const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURIComponent(file.name)}`;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext);
+
+                    let previewContent = isImg ? 
+                        `<img src="${rawUrl}" alt="${file.name}">` : 
+                        `<div class="audio-icon">${ext.toUpperCase()}</div>`;
+
+                    let optionsHtml = formatOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+
+                    const row = document.createElement("div");
+                    row.className = "format-row";
+                    row.innerHTML = `
+                        ${previewContent}
+                        <div style="flex: 1; overflow: hidden;">
+                            <div style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${file.name}">${file.name}</div>
+                        </div>
+                        <div class="format-select-wrapper">
+                            <select id="format-select-${index}" data-filename="${file.name}">
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                    `;
+                    modalBody.appendChild(row);
+                });
+            }
+
+            document.getElementById("formatModal").style.display = "flex";
+        }
+
+        function closeFormatModal() {
+            document.getElementById("formatModal").style.display = "none";
+        }
+
+        function confirmFormatSelections() {
+            const selects = document.querySelectorAll("#modalBodyList select");
+            let results = [];
+            selects.forEach(sel => {
+                const filename = sel.getAttribute("data-filename");
+                const selectedFormat = sel.value;
+                results.push({ filename, format: selectedFormat });
+            });
+
+            console.log("用户选择的导出格式结果：", results);
+            alert("格式选择已保存！保留原始格式，不做自动转码。");
+            closeFormatModal();
+        }
+    </script>
+</body>
+</html>
